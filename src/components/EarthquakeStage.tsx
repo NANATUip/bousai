@@ -41,6 +41,7 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
   const [playerPosition, setPlayerPosition] = useState<number>(50); // percentage (0 to 100)
   const [items, setItems] = useState<FallingItem[]>([]);
   const [timeLeft, setTimeLeft] = useState<number>(20); // 20 seconds gameplay
+  const [escapeTimeLeft, setEscapeTimeLeft] = useState<number>(28); // 避難残り時間
   const [activeEffects, setActiveEffects] = useState<{ id: string; text: string; color: string; x: number; y: number }[]>([]);
   const [quizAnswered, setQuizAnswered] = useState<boolean>(false);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -51,16 +52,67 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
   const gameLoopRef = useRef<number | null>(null);
   const spawnTimerRef = useRef<any>(null);
   const countdownRef = useRef<any>(null);
+  const escapeCountdownRef = useRef<any>(null);
   const playerPositionRef = useRef<number>(50);
   const collidedItemsRef = useRef<FallingItem[]>([]);
+  const escapedItemsRef = useRef<FallingItem[]>([]);
+  const justDodgedItemsRef = useRef<FallingItem[]>([]);
   const processedItemIdsRef = useRef<Set<string>>(new Set());
   const justDodgeProcessedRef = useRef<Set<string>>(new Set());
   const comboRef = useRef<number>(0);
+
+  // Time Over Handler (Force result screen)
+  const handleTimeOver = () => {
+    if (spawnTimerRef.current) clearInterval(spawnTimerRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    if (escapeCountdownRef.current) clearInterval(escapeCountdownRef.current);
+    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+
+    setPlayerStats((prev) => ({
+      ...prev,
+      health: 0,
+      survivalResult: 'FAILED_EARTHQUAKE',
+    }));
+    
+    onNextPhase('RESULT');
+  };
 
   // Keep player position ref up to date
   useEffect(() => {
     playerPositionRef.current = playerPosition;
   }, [playerPosition]);
+
+  // Global Countdown Timer for Earthquake
+  useEffect(() => {
+    if (phase !== 'PLAYING' && phase !== 'QUIZ') {
+      if (escapeCountdownRef.current) {
+        clearInterval(escapeCountdownRef.current);
+        escapeCountdownRef.current = null;
+      }
+      return;
+    }
+
+    if (!escapeCountdownRef.current) {
+      escapeCountdownRef.current = setInterval(() => {
+        setEscapeTimeLeft((prev) => {
+          if (prev <= 0.1) {
+            clearInterval(escapeCountdownRef.current);
+            escapeCountdownRef.current = null;
+            handleTimeOver();
+            return 0;
+          }
+          return Number((prev - 0.1).toFixed(1));
+        });
+      }, 100);
+    }
+
+    return () => {
+      if (escapeCountdownRef.current) {
+        clearInterval(escapeCountdownRef.current);
+        escapeCountdownRef.current = null;
+      }
+    };
+  }, [phase]);
 
   const spawnSpecificItem = (type: FallingItem['type'], label: string) => {
     const playerX = playerPositionRef.current;
@@ -147,6 +199,9 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
     setItems([]);
     processedItemIdsRef.current.clear();
     justDodgeProcessedRef.current.clear();
+    collidedItemsRef.current = [];
+    escapedItemsRef.current = [];
+    justDodgedItemsRef.current = [];
     setCombo(0);
     comboRef.current = 0;
     setMaxCombo(0);
@@ -252,13 +307,31 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
     }
 
     const diff = playerStats.difficulty;
-    const speedMultiplier = diff === 'EASY' ? 0.65 : diff === 'HARD' ? 1.45 : 1.0;
+    
+    // 難易度による基本速度倍率の設定（メリハリを強めるために微調整）
+    const speedMultiplier = diff === 'EASY' ? 0.55 : diff === 'HARD' ? 1.65 : 1.0;
+
+    // 落下物の種類に応じた個別基本速度（重さや軽さをゲームデザイン的に表現）
+    let baseSpeed = 1.2;
+    if (type === 'DEBRIS_GLASS') {
+      // ガラス片：軽いため少し速めかつランダム性が高め
+      baseSpeed = Math.random() * 0.8 + 1.4; 
+    } else if (type === 'DEBRIS_BOOK') {
+      // 本：標準的な落下速度
+      baseSpeed = Math.random() * 0.6 + 1.1;
+    } else if (type === 'DEBRIS_SHELF') {
+      // 家具：重いためやや遅い、ただしサイズが大きい
+      baseSpeed = Math.random() * 0.4 + 0.8;
+    } else {
+      // 支援・救助アイテム：プレイヤーが拾いやすいよう優しめの速度
+      baseSpeed = Math.random() * 0.4 + 1.0;
+    }
 
     const newItem: FallingItem = {
       id: getUniqueId(),
       x: Math.random() * 90 + 5, // 5% to 95%
       y: 0,
-      speed: (Math.random() * 1.5 + 1.2) * speedMultiplier,
+      speed: baseSpeed * speedMultiplier,
       type,
       width: type.startsWith('DEBRIS_SHELF') ? 14 : 10,
       label,
@@ -283,6 +356,51 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [phase]);
 
+  // 回避成功（自然消滅）時の処理
+  const handleEscape = (item: FallingItem) => {
+    if (item.type.startsWith('DEBRIS')) {
+      const nextCombo = comboRef.current + 1;
+      comboRef.current = nextCombo;
+      setCombo(nextCombo);
+      setMaxCombo((mc) => Math.max(mc, nextCombo));
+      
+      // 特定コンボでまだ持っていないアイテムを目の前に確定出現させる！(実力重視)
+      if (nextCombo === 4 && !playerStats.hasHelmet) {
+        spawnSpecificItem('ITEM_HELMET', 'ヘルメット🪖');
+      } else if (nextCombo === 8 && !playerStats.hasShoes) {
+        spawnSpecificItem('ITEM_SHOES', '避難用シューズ👟');
+      } else if (nextCombo === 12 && !playerStats.hasBag) {
+        spawnSpecificItem('ITEM_BAG', '非常持出袋🎒');
+      }
+
+      // 回避自体に対する基礎スコア
+      setPlayerStats((prev) => ({
+        ...prev,
+        score: prev.score + 10 + (nextCombo * 2), // コンボが繋がるほどスコア増加
+      }));
+
+      if (nextCombo % 3 === 0) {
+        addEffect(item.id, `${nextCombo} COMBO!`, 'text-cyan-400 font-extrabold text-xs', item.x, 90);
+      }
+    }
+  };
+
+  // ジャスト回避成功時の処理
+  const handleJustDodge = (item: FallingItem) => {
+    const nextCombo = comboRef.current + 1;
+    comboRef.current = nextCombo;
+    setCombo(nextCombo);
+    setMaxCombo((mc) => Math.max(mc, nextCombo));
+
+    setPlayerStats((prev) => ({
+      ...prev,
+      score: prev.score + 40,
+      health: Math.min(prev.maxHealth, prev.health + 2), // 実力回避でHPが2回復！
+    }));
+    
+    addEffect(item.id, '⚡ JUST DODGE! +40', 'text-amber-300 font-black tracking-wider text-[9px] animate-pulse', item.x, 75);
+  };
+
   // Main game loop (running animation frame)
   useEffect(() => {
     if (phase !== 'PLAYING') {
@@ -294,7 +412,7 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
     }
 
     const updatePhysics = () => {
-      // Handle collisions safely outside of React's state reducer step at the start of frame
+      // 1. 衝突の処理
       if (collidedItemsRef.current.length > 0) {
         const toProcess = [...collidedItemsRef.current];
         collidedItemsRef.current = [];
@@ -303,8 +421,23 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
         }
       }
 
-      // イベントを一時的にプールする配列
-      const events: (() => void)[] = [];
+      // 2. 回避成功（自然消滅）の処理
+      if (escapedItemsRef.current.length > 0) {
+        const toProcess = [...escapedItemsRef.current];
+        escapedItemsRef.current = [];
+        for (const item of toProcess) {
+          handleEscape(item);
+        }
+      }
+
+      // 3. ジャスト回避の処理
+      if (justDodgedItemsRef.current.length > 0) {
+        const toProcess = [...justDodgedItemsRef.current];
+        justDodgedItemsRef.current = [];
+        for (const item of toProcess) {
+          handleJustDodge(item);
+        }
+      }
 
       setItems((prevItems) => {
         const updated: FallingItem[] = [];
@@ -315,73 +448,33 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
           }
           const nextY = item.y + item.speed;
 
-          // プレイヤーとの衝突判定（アバターの高さ：82% 〜 96% に合わせて判定）
-          if (nextY >= 82 && nextY <= 96) {
+          // プレイヤーとの衝突判定（あなたのアイコン（🚶）に接触する高さ：88% 〜 98%（アイコン高さ10%）に合わせて判定）
+          if (nextY >= 88 && nextY <= 98) {
             const distance = Math.abs(item.x - playerPositionRef.current);
-            if (distance < (item.width / 2 + 6)) {
+            // 落下物アイコン（半径約2%）とアバターアイコン（半径約3%）の接触判定（合計5.0%未満で衝突）
+            if (distance < 5.0) {
               // 衝突！
               processedItemIdsRef.current.add(item.id);
               collidedItemsRef.current.push(item);
-              continue; // リストから除外（画面から消える）
+              continue; // 接触したら即座に消す（効果を適用してリストから除外）
             }
           }
 
           // 地面への落下（98%に達するまで落下を続け、98%以上で自然に消える）
           if (nextY >= 98) {
             processedItemIdsRef.current.add(item.id);
-            if (item.type.startsWith('DEBRIS')) {
-              // 障害物を回避成功！コンボ加算
-              events.push(() => {
-                const nextCombo = comboRef.current + 1;
-                comboRef.current = nextCombo;
-                setCombo(nextCombo);
-                setMaxCombo((mc) => Math.max(mc, nextCombo));
-                
-                // 特定コンボでまだ持っていないアイテムを目の前に確定出現させる！(実力重視)
-                if (nextCombo === 4 && !playerStats.hasHelmet) {
-                  spawnSpecificItem('ITEM_HELMET', 'ヘルメット🪖');
-                } else if (nextCombo === 8 && !playerStats.hasShoes) {
-                  spawnSpecificItem('ITEM_SHOES', '避難用シューズ👟');
-                } else if (nextCombo === 12 && !playerStats.hasBag) {
-                  spawnSpecificItem('ITEM_BAG', '非常持出袋🎒');
-                }
-
-                // 回避自体に対する基礎スコア
-                setPlayerStats((prev) => ({
-                  ...prev,
-                  score: prev.score + 10 + (nextCombo * 2), // コンボが繋がるほどスコア増加
-                }));
-
-                if (nextCombo % 3 === 0) {
-                  addEffect(item.id, `${nextCombo} COMBO!`, 'text-cyan-400 font-extrabold text-xs', item.x, 90);
-                }
-              });
-            }
+            escapedItemsRef.current.push(item);
             continue;
           }
 
           // ジャスト回避判定（地面近くで衝突はせず、かつ極めて近い距離をすり抜けた場合）
-          if (item.type.startsWith('DEBRIS') && nextY >= 75 && nextY <= 95) {
+          if (item.type.startsWith('DEBRIS') && nextY >= 82 && nextY <= 98) {
             const distance = Math.abs(item.x - playerPositionRef.current);
-            const minCollideDist = item.width / 2 + 6;
-            // 衝突範囲外だが、幅+7px以内を通過した場合
-            if (distance >= minCollideDist && distance < minCollideDist + 7 && !justDodgeProcessedRef.current.has(item.id)) {
+            const minCollideDist = 5.0; // 衝突判定の境界（アイコン基準）
+            // 衝突範囲外（5%以上）だが、極めて近い距離（8.5%未満）を通過した場合
+            if (distance >= minCollideDist && distance < minCollideDist + 3.5 && !justDodgeProcessedRef.current.has(item.id)) {
               justDodgeProcessedRef.current.add(item.id);
-              
-              events.push(() => {
-                const nextCombo = comboRef.current + 1;
-                comboRef.current = nextCombo;
-                setCombo(nextCombo);
-                setMaxCombo((mc) => Math.max(mc, nextCombo));
-
-                setPlayerStats((prev) => ({
-                  ...prev,
-                  score: prev.score + 40,
-                  health: Math.min(prev.maxHealth, prev.health + 2), // 実力回避でHPが2回復！
-                }));
-                
-                addEffect(item.id, '⚡ JUST DODGE! +40', 'text-amber-300 font-black tracking-wider text-[9px] animate-pulse', item.x, 75);
-              });
+              justDodgedItemsRef.current.push(item);
             }
           }
 
@@ -389,11 +482,6 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
         }
         return updated;
       });
-
-      // 状態更新updater関数の外側で、溜まった全ての更新イベントを同期的・安全に実行する
-      for (const triggerEvent of events) {
-        triggerEvent();
-      }
 
       gameLoopRef.current = requestAnimationFrame(updatePhysics);
     };
@@ -677,14 +765,25 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col gap-4"
+            className="flex flex-col gap-2 w-full max-w-xl mx-auto"
             id="eq-gameplay-container"
           >
-            {/* Status Header */}
-            <div className="flex justify-between items-center bg-slate-900/60 p-4 rounded-2xl border border-slate-800" id="eq-status-bar">
-              <div className="flex items-center gap-3" id="health-container">
-                <span className="text-xs text-slate-400 font-bold uppercase">生存体力:</span>
-                <div className="w-28 bg-slate-950 h-3.5 rounded-full overflow-hidden border border-slate-800 flex" id="health-track">
+            {/* Realtime Escape Timer */}
+            <div className="w-full py-1.5 px-3 bg-red-950/40 border border-red-500/30 rounded-xl text-center flex items-center justify-between gap-3 animate-pulse" id="eq-realtime-escape-timer">
+              <span className="flex items-center gap-1.5 text-[10px] md:text-xs font-black text-red-400">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                🚨 避難制限（倒壊リミット）
+              </span>
+              <span className={`font-mono text-lg md:text-xl font-black ${escapeTimeLeft <= 5 ? 'text-red-500 scale-110' : 'text-orange-400'}`}>
+                {escapeTimeLeft.toFixed(1)} 秒
+              </span>
+            </div>
+
+            {/* Status Header - More compact */}
+            <div className="flex justify-between items-center bg-slate-900/60 p-2 rounded-xl border border-slate-800" id="eq-status-bar">
+              <div className="flex items-center gap-2" id="health-container">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">HP:</span>
+                <div className="w-20 bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800 flex" id="health-track">
                   <div
                     className={`h-full transition-all duration-150 ${
                       playerStats.health > 50 ? 'bg-emerald-500' : playerStats.health > 25 ? 'bg-amber-500' : 'bg-red-500 animate-pulse'
@@ -693,53 +792,52 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
                     id="health-fill"
                   />
                 </div>
-                <span className="text-xs font-mono font-bold text-slate-200" id="health-number">{playerStats.health}%</span>
+                <span className="text-[10px] font-mono font-bold text-slate-200" id="health-number">{playerStats.health}%</span>
               </div>
 
-              {/* Combo Counter Panel (Action Skill Feedback) */}
-              <div className="text-center px-3 py-1 bg-slate-950/60 rounded-xl border border-slate-800/80 min-w-[70px]" id="combo-panel">
-                <span className="text-[8px] text-cyan-400 block uppercase font-extrabold tracking-widest animate-pulse">Combo</span>
-                <span className="text-base font-mono font-extrabold text-cyan-300" id="combo-count">{combo}</span>
-                <span className="text-[7.5px] text-slate-500 block">Max: {maxCombo}</span>
+              {/* Combo Counter Panel */}
+              <div className="text-center px-2 py-0.5 bg-slate-950/60 rounded-lg border border-slate-800/80 min-w-[50px]" id="combo-panel">
+                <span className="text-[7px] text-cyan-400 block uppercase font-extrabold tracking-widest leading-none">Combo</span>
+                <span className="text-xs font-mono font-extrabold text-cyan-300" id="combo-count">{combo}</span>
               </div>
 
               <div className="text-center" id="timer-container">
-                <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">揺れの継続</span>
-                <span className="text-2xl font-mono font-extrabold text-amber-500" id="timer-number">{timeLeft}s</span>
+                <span className="text-[8px] text-slate-400 block uppercase font-bold tracking-wider leading-none">耐える時間</span>
+                <span className="text-sm font-mono font-extrabold text-amber-500 animate-pulse" id="timer-number">{timeLeft}s</span>
               </div>
 
               <div className="text-right" id="score-container">
-                <span className="text-xs text-slate-400 font-bold uppercase block">スコア:</span>
-                <span className="text-sm font-mono font-bold text-white" id="score-number">{playerStats.score}</span>
+                <span className="text-[9px] text-slate-400 font-bold uppercase block leading-none">スコア:</span>
+                <span className="text-xs font-mono font-bold text-white" id="score-number">{playerStats.score}</span>
               </div>
             </div>
 
-            {/* Collected Equipment indicators */}
-            <div className="flex gap-2 justify-center bg-slate-900/40 p-2 rounded-xl border border-slate-800/50" id="eq-equipments">
-              <span className="text-[10px] text-slate-400 font-bold self-center mr-2">装備:</span>
-              <div className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 border transition-all ${
+            {/* Collected Equipment indicators - Slimmer */}
+            <div className="flex gap-1.5 justify-center bg-slate-900/40 p-1.5 rounded-lg border border-slate-800/50" id="eq-equipments">
+              <span className="text-[9px] text-slate-400 font-bold self-center mr-1">装備:</span>
+              <div className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 border transition-all ${
                 playerStats.hasHelmet ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 font-bold' : 'bg-slate-950/40 border-slate-800 text-slate-500'
               }`} id="badge-helmet">
-                <Shield className="w-3.5 h-3.5" />
-                ヘルメット {playerStats.hasHelmet ? '装着' : '未回収'}
+                <Shield className="w-3 h-3" />
+                ヘル{playerStats.hasHelmet ? '○' : '×'}
               </div>
-              <div className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 border transition-all ${
+              <div className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 border transition-all ${
                 playerStats.hasShoes ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-bold' : 'bg-slate-950/40 border-slate-800 text-slate-500'
               }`} id="badge-shoes">
-                <Footprints className="w-3.5 h-3.5" />
-                避難用シューズ {playerStats.hasShoes ? '獲得' : '未回収'}
+                <Footprints className="w-3 h-3" />
+                靴{playerStats.hasShoes ? '○' : '×'}
               </div>
-              <div className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 border transition-all ${
+              <div className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 border transition-all ${
                 playerStats.hasBag ? 'bg-blue-500/10 border-blue-500/30 text-blue-300 font-bold' : 'bg-slate-950/40 border-slate-800 text-slate-500'
               }`} id="badge-bag">
-                <Zap className="w-3.5 h-3.5" />
-                非常袋 {playerStats.hasBag ? '回収' : '未回収'}
+                <Zap className="w-3 h-3" />
+                袋{playerStats.hasBag ? '○' : '×'}
               </div>
             </div>
 
-            {/* Simulated Room Viewport */}
+            {/* Simulated Room Viewport - Height reduced to prevent page scroll */}
             <div
-              className="relative w-full h-[380px] bg-slate-950/90 border-2 border-slate-800 rounded-2xl overflow-hidden shadow-inner flex items-end justify-center"
+              className="relative w-full h-[190px] md:h-[240px] bg-slate-950/90 border-2 border-slate-800 rounded-2xl overflow-hidden shadow-inner flex items-end justify-center"
               style={{
                 // Shaking effect based on time left (simulates earthquake vibration)
                 transform: timeLeft > 0 ? `translate(${(Math.random() - 0.5) * 4}px, ${(Math.random() - 0.5) * 4}px)` : 'none',
@@ -868,20 +966,31 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-slate-900 border-2 border-orange-500/70 rounded-3xl p-6 md:p-8 shadow-2xl shadow-orange-500/10"
+            className="bg-slate-900 border-2 border-orange-500/70 rounded-2xl p-4 md:p-5 shadow-2xl shadow-orange-500/10 w-full max-w-xl mx-auto"
             id="eq-quiz-card"
           >
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold mb-4" id="quiz-badge">
-              <Flame className="w-3.5 h-3.5" />
+            {/* Realtime Escape Timer */}
+            <div className="w-full py-1.5 px-3 bg-red-950/40 border border-red-500/30 rounded-xl text-center flex items-center justify-between gap-3 mb-3 animate-pulse" id="eq-quiz-escape-timer">
+              <span className="flex items-center gap-1.5 text-[10px] md:text-xs font-black text-red-400">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                🚨 避難制限（回答中もタイマーは減少します）
+              </span>
+              <span className={`font-mono text-lg md:text-xl font-black ${escapeTimeLeft <= 5 ? 'text-red-500 scale-110' : 'text-orange-400'}`}>
+                {escapeTimeLeft.toFixed(1)} 秒
+              </span>
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-bold mb-2.5" id="quiz-badge">
+              <Flame className="w-3 h-3" />
               急を要する状況判断！
             </div>
 
-            <h3 className="text-xl font-bold text-white mb-2 leading-relaxed" id="quiz-question">
+            <h3 className="text-sm md:text-base font-bold text-white mb-1.5 leading-snug" id="quiz-question">
               揺れが少し収まりました。まず最初に取るべき行動はどれでしょう？
             </h3>
-            <p className="text-xs text-slate-400 mb-6">※正しく迅速な行動は、命を守り避難成功率を大きく上げます。</p>
+            <p className="text-[10px] text-slate-400 mb-3">※正しく迅速な行動は、命を守り避難成功率を大きく上げます。</p>
 
-            <div className="space-y-3" id="quiz-options">
+            <div className="space-y-2.5" id="quiz-options">
               {/* Option 1 */}
               <button
                 disabled={quizAnswered}
@@ -970,13 +1079,13 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-6 p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-400 leading-relaxed"
+                className="mt-3 p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[10.5px] text-slate-400 leading-normal"
                 id="quiz-feedback"
               >
-                <strong className="text-white block mb-1">💡 解説:</strong>
-                地震直後の室内は割れたガラス等の破片が散乱しているため、素足や靴下で歩くと大怪我をします。
-                まずは<strong className="text-emerald-400">足元を靴やスリッパで保護する</strong>ことが大切です。また、余震で閉じ込められるのを防ぐために「避難用のドアを開けておくこと」が鉄則です。
-                エレベーターは地震による停電で閉じ込められる危険が極めて高いため、絶対に使用してはいけません。
+                <strong className="text-white block mb-0.5 text-xs">💡 解説:</strong>
+                地震直後の室内は割れた破片等が多く靴が必要です。
+                まずは<strong className="text-emerald-400">足元を靴で保護する</strong>ことが鉄則。余震に備えてドアを開け避難経路を確保します。
+                エレベーターは停電閉じ込めの危険があるため絶対に使用禁止です。
               </motion.div>
             )}
           </motion.div>

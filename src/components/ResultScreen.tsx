@@ -1,6 +1,15 @@
+import { useEffect, useState, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Award, RefreshCw, CheckCircle2, XCircle, ShieldCheck, Heart, AlertTriangle, BookOpen, BookOpenCheck } from 'lucide-react';
+import { Award, RefreshCw, CheckCircle2, XCircle, ShieldCheck, Heart, AlertTriangle, BookOpen, BookOpenCheck, Trophy, Trash2, History } from 'lucide-react';
 import { PlayerStats, GamePhase } from '../types';
+
+interface ScoreRecord {
+  id: string;
+  score: number;
+  difficulty: string;
+  isSurvived: boolean;
+  date: string;
+}
 
 interface ResultScreenProps {
   playerStats: PlayerStats;
@@ -11,6 +20,71 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
   // Score calculations
   const isSurvived = playerStats.survivalResult === 'SURVIVED' || playerStats.survivalResult === 'INJURED_SURVIVED';
   
+  const [rankings, setRankings] = useState<ScoreRecord[]>([]);
+  const [bestScore, setBestScore] = useState<number>(0);
+  const [isNewHighScore, setIsNewHighScore] = useState<boolean>(false);
+  const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
+  const hasSavedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasSavedRef.current) return;
+    hasSavedRef.current = true;
+
+    try {
+      const saved = localStorage.getItem('bosai_sim_rankings');
+      let currentRecords: ScoreRecord[] = saved ? JSON.parse(saved) : [];
+      
+      // Determine the previous high score
+      const prevBest = currentRecords.length > 0 
+        ? Math.max(...currentRecords.map(r => r.score)) 
+        : 0;
+
+      const now = new Date();
+      const dateString = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      const newRecord: ScoreRecord = {
+        id: Math.random().toString(36).substring(2, 9),
+        score: playerStats.score,
+        difficulty: playerStats.difficulty,
+        isSurvived: playerStats.survivalResult === 'SURVIVED' || playerStats.survivalResult === 'INJURED_SURVIVED',
+        date: dateString
+      };
+
+      const updatedRecords = [...currentRecords, newRecord];
+      
+      // Sort descending by score
+      updatedRecords.sort((a, b) => b.score - a.score);
+
+      // Save to localStorage
+      localStorage.setItem('bosai_sim_rankings', JSON.stringify(updatedRecords));
+      
+      setRankings(updatedRecords);
+
+      const currentBest = updatedRecords[0]?.score || 0;
+      setBestScore(currentBest);
+
+      if (playerStats.score > prevBest && currentRecords.length > 0) {
+        setIsNewHighScore(true);
+      } else if (currentRecords.length === 0) {
+        setIsNewHighScore(true); // First game is always high score
+      }
+    } catch (e) {
+      console.error('Failed to handle rankings:', e);
+    }
+  }, [playerStats]);
+
+  const handleClearRankings = () => {
+    try {
+      localStorage.removeItem('bosai_sim_rankings');
+      setRankings([]);
+      setBestScore(0);
+      setIsNewHighScore(false);
+      setShowClearConfirm(false);
+    } catch (e) {
+      console.error('Failed to clear rankings:', e);
+    }
+  };
+
   // Calculate Grade
   let grade = 'D';
   let gradeColor = 'text-red-500';
@@ -28,7 +102,7 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
     } else {
       grade = 'B';
       gradeColor = 'text-blue-400';
-      feedbackText = '無事に避難できましたが、危険な判断や装備の不足がありました。実際の災害では、この差が命取りになることもあります。解説をよく読んで学びましょう。';
+      feedbackText = '無さに避難できましたが、危険な判断や装備の不足がありました。実際の災害では、この差が命取りになることもあります。解説をよく読んで学びましょう。';
     }
   } else {
     if (playerStats.survivalResult === 'FAILED_EARTHQUAKE') {
@@ -80,22 +154,154 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
         </div>
 
         {/* Grade and Score display */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-lg mb-8 bg-slate-950 p-6 rounded-2xl border border-slate-800/80" id="stats-grid">
-          <div className="flex flex-col items-center justify-center border-r border-slate-800 md:border-r" id="grade-col">
-            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">サバイバル評価ランク</span>
-            <span className={`text-6xl font-black ${gradeColor}`} id="rank-value">{grade}</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-2xl mb-8 bg-slate-950 p-6 rounded-2xl border border-slate-800/80" id="stats-grid">
+          <div className="flex flex-col items-center justify-center border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-slate-800/60" id="grade-col">
+            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">サバイバル評価</span>
+            <span className={`text-5xl font-black ${gradeColor}`} id="rank-value">{grade}</span>
           </div>
-          <div className="flex flex-col items-center justify-center pt-4 md:pt-0" id="score-col">
+          <div className="flex flex-col items-center justify-center border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-slate-800/60" id="score-col">
             <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">獲得総合スコア</span>
             <span className="text-3xl font-mono font-black text-white" id="score-value">{playerStats.score} <span className="text-xs text-slate-400">Pts</span></span>
-            <span className="text-[10px] text-slate-500 mt-1">※適切な防災アクション、正しい判断で加算</span>
+            {isNewHighScore && (
+              <span className="text-[10px] bg-amber-500/10 text-amber-400 font-extrabold px-2 py-0.5 rounded border border-amber-500/30 animate-pulse mt-1.5 flex items-center gap-1">
+                🏆 自己ベスト更新!
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col items-center justify-center pt-4 md:pt-0" id="best-score-col">
+            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+              <Trophy className="w-3.5 h-3.5 text-yellow-500" /> 自己ベスト
+            </span>
+            <span className="text-3xl font-mono font-black text-yellow-500" id="best-score-value">
+              {bestScore} <span className="text-xs text-yellow-500/85">Pts</span>
+            </span>
           </div>
         </div>
 
         {/* Feedback description */}
-        <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-xl mb-10 border-b border-slate-800 pb-6" id="feedback-desc">
+        <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-xl mb-8 border-b border-slate-800 pb-6" id="feedback-desc">
           <strong>総評:</strong> {feedbackText}
         </p>
+
+        {/* Rankings & Play History Section */}
+        <div className="w-full bg-slate-950 p-5 rounded-2xl border border-slate-800 text-left mb-10" id="rankings-panel">
+          <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-yellow-500" />
+              シミュレーションベストスコア & 挑戦履歴
+            </h3>
+            {rankings.length > 0 && (
+              <div className="relative">
+                {!showClearConfirm ? (
+                  <button
+                    onClick={() => setShowClearConfirm(true)}
+                    className="text-xs text-slate-500 hover:text-red-400 flex items-center gap-1 transition-colors cursor-pointer"
+                    id="btn-confirm-clear"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> 履歴消去
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 bg-slate-900 border border-red-500/30 p-1.5 rounded text-[11px]" id="clear-confirm-tooltip">
+                    <span className="text-red-400 font-bold">本当に消去しますか？</span>
+                    <button
+                      onClick={handleClearRankings}
+                      className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded font-bold cursor-pointer"
+                    >
+                      はい
+                    </button>
+                    <button
+                      onClick={() => setShowClearConfirm(false)}
+                      className="bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded font-bold cursor-pointer"
+                    >
+                      いいえ
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {rankings.length === 0 ? (
+            <p className="text-xs text-slate-500 text-center py-4">データがありません</p>
+          ) : (
+            <div className="overflow-x-auto" id="rankings-table-wrapper">
+              <table className="w-full text-xs text-slate-300">
+                <thead>
+                  <tr className="border-b border-slate-800/80 text-slate-500">
+                    <th className="pb-2 font-bold text-left w-12">順位</th>
+                    <th className="pb-2 font-bold text-left">プレイ日時</th>
+                    <th className="pb-2 font-bold text-center">難易度</th>
+                    <th className="pb-2 font-bold text-center">生存結果</th>
+                    <th className="pb-2 font-bold text-right">スコア</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-900/60 font-mono">
+                  {rankings.slice(0, 5).map((record, index) => {
+                    const isCurrent = record.id === rankings.find(r => r.score === playerStats.score && r.difficulty === playerStats.difficulty)?.id;
+                    let rankBadge = `${index + 1}`;
+                    let rankClass = 'text-slate-400';
+                    if (index === 0) {
+                      rankBadge = '🥇';
+                      rankClass = 'text-yellow-400 font-bold';
+                    } else if (index === 1) {
+                      rankBadge = '🥈';
+                      rankClass = 'text-slate-300 font-bold';
+                    } else if (index === 2) {
+                      rankBadge = '🥉';
+                      rankClass = 'text-amber-600 font-bold';
+                    }
+
+                    return (
+                      <tr 
+                        key={record.id} 
+                        className={`hover:bg-slate-900/40 transition-colors ${
+                          isCurrent ? 'bg-slate-800/40 font-bold border-l-2 border-l-amber-500' : ''
+                        }`}
+                      >
+                        <td className="py-2 pl-1 text-left">
+                          <span className={rankClass}>{rankBadge}</span>
+                        </td>
+                        <td className="py-2 text-slate-400 text-[11px] font-sans text-left">
+                          {record.date} {isCurrent && <span className="text-[10px] text-amber-400 font-sans ml-1 font-bold">← 今回</span>}
+                        </td>
+                        <td className="py-2 text-center">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-extrabold ${
+                            record.difficulty === 'EASY' 
+                              ? 'bg-emerald-500/10 text-emerald-400' 
+                              : record.difficulty === 'HARD' 
+                              ? 'bg-rose-500/10 text-rose-400' 
+                              : 'bg-amber-500/10 text-amber-400'
+                          }`}>
+                            {record.difficulty === 'EASY' ? 'EASY' : record.difficulty === 'NORMAL' ? 'NORMAL' : 'HARD'}
+                          </span>
+                        </td>
+                        <td className="py-2 text-center">
+                          {record.isSurvived ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/10 font-sans font-bold">
+                              生存成功
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/10 font-sans font-bold">
+                              生存失敗
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 text-right font-bold text-white text-sm">
+                          {record.score} <span className="text-[10px] text-slate-500 font-normal">Pts</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {rankings.length > 5 && (
+                <p className="text-[10px] text-slate-500 mt-2 text-right font-sans">
+                  他 {rankings.length - 5} 件の記録が保存されています
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Action / Decisions Log */}
         <div className="w-full text-left mb-10" id="decisions-log-container">
@@ -208,21 +414,48 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
             {/* DECISION 2: Tsunami Car */}
             <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-car">
               <div className="mt-0.5">
-                {playerStats.tsunamiDecisions.carVsFoot === 'foot' ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                {playerStats.tsunamiDecisions.carResult ? (
+                  playerStats.tsunamiDecisions.carResult.resultType === 'correct' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : playerStats.tsunamiDecisions.carResult.resultType === 'semi' ? (
+                    <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400" />
+                  )
                 ) : (
-                  <XCircle className="w-5 h-5 text-red-400" />
+                  playerStats.tsunamiDecisions.carVsFoot === 'foot' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400" />
+                  )
                 )}
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-white text-sm flex justify-between">
-                  <span>🚶 避難手段：徒歩 vs 車</span>
-                  <span className={playerStats.tsunamiDecisions.carVsFoot === 'foot' ? 'text-emerald-400' : 'text-red-400'}>
-                    {playerStats.tsunamiDecisions.carVsFoot === 'foot' ? '適切：徒歩を選択' : '不適切：車を選択 (渋滞に捕まりました)'}
+                <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
+                  <span>🚶 {playerStats.tsunamiDecisions.carResult?.title || '避難手段の選択'}</span>
+                  <span className={
+                    playerStats.tsunamiDecisions.carResult 
+                      ? playerStats.tsunamiDecisions.carResult.resultType === 'correct'
+                        ? 'text-emerald-400'
+                        : playerStats.tsunamiDecisions.carResult.resultType === 'semi'
+                        ? 'text-amber-400'
+                        : 'text-red-400'
+                      : playerStats.tsunamiDecisions.carVsFoot === 'foot' ? 'text-emerald-400' : 'text-red-400'
+                  }>
+                    {playerStats.tsunamiDecisions.carResult 
+                      ? `${playerStats.tsunamiDecisions.carResult.badge}：${playerStats.tsunamiDecisions.carResult.desc}`
+                      : playerStats.tsunamiDecisions.carVsFoot === 'foot' ? '適切：徒歩を選択' : '不適切：車を選択 (渋滞に捕まりました)'}
                   </span>
                 </h4>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  東日本大震災でも車が道路渋滞を引き起こし、そのまま波にのまれる大惨事が起きています。特別な支援を必要とする方を除き、津波避難は「徒歩」が基本です。
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                  {playerStats.tsunamiDecisions.carResult ? (
+                    <>
+                      <span className="text-slate-300 block mb-1"><strong>選択した避難手段:</strong> {playerStats.tsunamiDecisions.carResult.selectedText}</span>
+                      <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.carResult.explanation}</strong>
+                    </>
+                  ) : (
+                    '東日本大震災でも車が道路渋滞を引き起こし、そのまま波にのまれる大惨事が起きています。特別な支援を必要とする方を除き、津波避難は「徒歩」が基本です。'
+                  )}
                 </p>
               </div>
             </div>
@@ -230,21 +463,48 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
             {/* DECISION 2.5: Tsunami Block Wall */}
             <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-blockwall">
               <div className="mt-0.5">
-                {playerStats.tsunamiDecisions.blockWall === 'wide' ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                {playerStats.tsunamiDecisions.blockWallResult ? (
+                  playerStats.tsunamiDecisions.blockWallResult.resultType === 'correct' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : playerStats.tsunamiDecisions.blockWallResult.resultType === 'semi' ? (
+                    <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400" />
+                  )
                 ) : (
-                  <XCircle className="w-5 h-5 text-red-400" />
+                  playerStats.tsunamiDecisions.blockWall === 'wide' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400" />
+                  )
                 )}
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-white text-sm flex justify-between">
-                  <span>🏘️ 避難ルート：安全な大通り vs 倒壊リスクのある住宅街の古いブロック塀沿い</span>
-                  <span className={playerStats.tsunamiDecisions.blockWall === 'wide' ? 'text-emerald-400' : 'text-red-400'}>
-                    {playerStats.tsunamiDecisions.blockWall === 'wide' ? '適切：広い大通りを選択' : '不適切：ブロック塀のそばを選択 (倒壊下敷きリスク)'}
+                <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
+                  <span>🏘️ {playerStats.tsunamiDecisions.blockWallResult?.title || '避難時の危険回避'}</span>
+                  <span className={
+                    playerStats.tsunamiDecisions.blockWallResult 
+                      ? playerStats.tsunamiDecisions.blockWallResult.resultType === 'correct'
+                        ? 'text-emerald-400'
+                        : playerStats.tsunamiDecisions.blockWallResult.resultType === 'semi'
+                        ? 'text-amber-400'
+                        : 'text-red-400'
+                      : playerStats.tsunamiDecisions.blockWall === 'wide' ? 'text-emerald-400' : 'text-red-400'
+                  }>
+                    {playerStats.tsunamiDecisions.blockWallResult 
+                      ? `${playerStats.tsunamiDecisions.blockWallResult.badge}：${playerStats.tsunamiDecisions.blockWallResult.desc}`
+                      : playerStats.tsunamiDecisions.blockWall === 'wide' ? '適切：広い大通りを選択' : '不適切：ブロック塀のそばを選択 (倒壊下敷きリスク)'}
                   </span>
                 </h4>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  大地震直後の密集市街地や住宅街には、古いブロック塀や自動販売機の倒壊リスクが潜んでいます。古い塀の近くは余震で倒れて下敷きになる危険性が非常に高いため、決して近寄らず、道幅の広い開けた大通りを避難ルートに選ぶのが鉄則です。
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                  {playerStats.tsunamiDecisions.blockWallResult ? (
+                    <>
+                      <span className="text-slate-300 block mb-1"><strong>選択した行動:</strong> {playerStats.tsunamiDecisions.blockWallResult.selectedText}</span>
+                      <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.blockWallResult.explanation}</strong>
+                    </>
+                  ) : (
+                    '大地震直後の密集市街地や住宅街には、古いブロック塀や自動販売機の倒壊リスクが潜んでいます。古い塀の近くは余震で倒れて下敷きになる危険性が非常に高いため、決して近寄らず、道幅の広い開けた大通りを避難ルートに選ぶのが鉄則です。'
+                  )}
                 </p>
               </div>
             </div>
@@ -252,21 +512,48 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
             {/* DECISION 3: Tsunami Route */}
             <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-route">
               <div className="mt-0.5">
-                {playerStats.tsunamiDecisions.routeSelection === 'safe' ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                {playerStats.tsunamiDecisions.routeResult ? (
+                  playerStats.tsunamiDecisions.routeResult.resultType === 'correct' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : playerStats.tsunamiDecisions.routeResult.resultType === 'semi' ? (
+                    <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400" />
+                  )
                 ) : (
-                  <XCircle className="w-5 h-5 text-red-400" />
+                  playerStats.tsunamiDecisions.routeSelection === 'safe' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400" />
+                  )
                 )}
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-white text-sm flex justify-between">
-                  <span>🗺️ 避難ルート：安全な道 vs 崖崩れ危険のある近道</span>
-                  <span className={playerStats.tsunamiDecisions.routeSelection === 'safe' ? 'text-emerald-400' : 'text-red-400'}>
-                    {playerStats.tsunamiDecisions.routeSelection === 'safe' ? '適切：安全な平坦道路' : '不適切：危険崖沿い道路 (土砂崩れの直撃)'}
+                <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
+                  <span>🗺️ {playerStats.tsunamiDecisions.routeResult?.title || '避難ルートの選択'}</span>
+                  <span className={
+                    playerStats.tsunamiDecisions.routeResult 
+                      ? playerStats.tsunamiDecisions.routeResult.resultType === 'correct'
+                        ? 'text-emerald-400'
+                        : playerStats.tsunamiDecisions.routeResult.resultType === 'semi'
+                        ? 'text-amber-400'
+                        : 'text-red-400'
+                      : playerStats.tsunamiDecisions.routeSelection === 'safe' ? 'text-emerald-400' : 'text-red-400'
+                  }>
+                    {playerStats.tsunamiDecisions.routeResult 
+                      ? `${playerStats.tsunamiDecisions.routeResult.badge}：${playerStats.tsunamiDecisions.routeResult.desc}`
+                      : playerStats.tsunamiDecisions.routeSelection === 'safe' ? '適切：安全な平坦道路' : '不適切：危険崖沿い道路 (土砂崩れの直撃)'}
                   </span>
                 </h4>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  大きな本震の直後は、斜面や地盤がとても不安定になっています。近道だからといって崖沿いを進むと、落石や土砂崩れに巻き込まれるため、遠回りでも安全な開けた道を選んで避難します。
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                  {playerStats.tsunamiDecisions.routeResult ? (
+                    <>
+                      <span className="text-slate-300 block mb-1"><strong>選択した避難ルート:</strong> {playerStats.tsunamiDecisions.routeResult.selectedText}</span>
+                      <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.routeResult.explanation}</strong>
+                    </>
+                  ) : (
+                    '大きな本震の直後は、斜面や地盤がとても不安定になっています。近道だからといって崖沿いを進むと、落石や土砂崩れに巻き込まれるため、遠回りでも安全な開けた道を選んで避難します。'
+                  )}
                 </p>
               </div>
             </div>
@@ -274,21 +561,48 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
             {/* DECISION 4: Tsunami building */}
             <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-stair">
               <div className="mt-0.5">
-                {playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                {playerStats.tsunamiDecisions.stairsResult ? (
+                  playerStats.tsunamiDecisions.stairsResult.resultType === 'correct' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : playerStats.tsunamiDecisions.stairsResult.resultType === 'semi' ? (
+                    <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400" />
+                  )
                 ) : (
-                  <XCircle className="w-5 h-5 text-red-400" />
+                  playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400" />
+                  )
                 )}
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-white text-sm flex justify-between">
-                  <span>🏢 垂直避難手段：非常階段 vs エレベーター</span>
-                  <span className={playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? 'text-emerald-400' : 'text-red-400'}>
-                    {playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? '適切：非常階段で這い上がる' : '不適切：エレベーターを使用'}
+                <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
+                  <span>🏢 {playerStats.tsunamiDecisions.stairsResult?.title || '垂直避難手段：非常階段 vs エレベーター'}</span>
+                  <span className={
+                    playerStats.tsunamiDecisions.stairsResult 
+                      ? playerStats.tsunamiDecisions.stairsResult.resultType === 'correct'
+                        ? 'text-emerald-400'
+                        : playerStats.tsunamiDecisions.stairsResult.resultType === 'semi'
+                        ? 'text-amber-400'
+                        : 'text-red-400'
+                      : playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? 'text-emerald-400' : 'text-red-400'
+                  }>
+                    {playerStats.tsunamiDecisions.stairsResult 
+                      ? `${playerStats.tsunamiDecisions.stairsResult.badge}：${playerStats.tsunamiDecisions.stairsResult.desc}`
+                      : playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? '適切：非常階段で這い上がる' : '不適切：エレベーターを使用'}
                   </span>
                 </h4>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  高台に逃げる時間がない場合は、近くの「津波避難ビル」などの丈夫な建物に垂直避難します。しかし、エレベーターは停電等による閉じ込めの致命的な罠となるため、絶対に階段を使用してください。
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                  {playerStats.tsunamiDecisions.stairsResult ? (
+                    <>
+                      <span className="text-slate-300 block mb-1"><strong>選択した避難行動:</strong> {playerStats.tsunamiDecisions.stairsResult.selectedText}</span>
+                      <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.stairsResult.explanation}</strong>
+                    </>
+                  ) : (
+                    '高台に逃げる時間がない場合は、近くの「津波避難ビル」などの丈夫な建物に垂直避難します。しかし、エレベーターは停電等による閉じ込めの致命的な罠となるため、絶対に階段を使用してください。'
+                  )}
                 </p>
               </div>
             </div>

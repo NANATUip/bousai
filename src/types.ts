@@ -1,6 +1,16 @@
 export type GamePhase = 'TITLE' | 'EARTHQUAKE_INTRO' | 'EARTHQUAKE' | 'TSUNAMI_INTRO' | 'TSUNAMI' | 'RESULT';
 export type Difficulty = 'EASY' | 'NORMAL' | 'HARD';
 
+export interface TsunamiDecisionResult {
+  title: string;
+  question: string;
+  selectedText: string;
+  resultType: 'correct' | 'semi' | 'incorrect';
+  badge: string;
+  desc: string;
+  explanation: string;
+}
+
 export interface PlayerStats {
   health: number;
   maxHealth: number;
@@ -14,6 +24,10 @@ export interface PlayerStats {
     blockWall: 'wide' | 'narrow' | null;
     routeSelection: 'cliff' | 'safe' | null;
     stairsVsElevator: 'stairs' | 'elevator' | null;
+    carResult?: TsunamiDecisionResult | null;
+    blockWallResult?: TsunamiDecisionResult | null;
+    routeResult?: TsunamiDecisionResult | null;
+    stairsResult?: TsunamiDecisionResult | null;
   };
   preparedItems: string[];
   survivalResult: 'SURVIVED' | 'INJURED_SURVIVED' | 'FAILED_TSUNAMI' | 'FAILED_EARTHQUAKE';
