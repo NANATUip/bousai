@@ -19,6 +19,8 @@ interface ResultScreenProps {
 export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps) {
   // Score calculations
   const isSurvived = playerStats.survivalResult === 'SURVIVED' || playerStats.survivalResult === 'INJURED_SURVIVED';
+  const finalScore = isSurvived ? playerStats.score : Math.round(playerStats.score * 0.7);
+  const deathPenaltyApplied = !isSurvived;
   
   const [rankings, setRankings] = useState<ScoreRecord[]>([]);
   const [bestScore, setBestScore] = useState<number>(0);
@@ -44,9 +46,9 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
       
       const newRecord: ScoreRecord = {
         id: Math.random().toString(36).substring(2, 9),
-        score: playerStats.score,
+        score: finalScore,
         difficulty: playerStats.difficulty,
-        isSurvived: playerStats.survivalResult === 'SURVIVED' || playerStats.survivalResult === 'INJURED_SURVIVED',
+        isSurvived: isSurvived,
         date: dateString
       };
 
@@ -63,7 +65,7 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
       const currentBest = updatedRecords[0]?.score || 0;
       setBestScore(currentBest);
 
-      if (playerStats.score > prevBest && currentRecords.length > 0) {
+      if (finalScore > prevBest && currentRecords.length > 0) {
         setIsNewHighScore(true);
       } else if (currentRecords.length === 0) {
         setIsNewHighScore(true); // First game is always high score
@@ -71,7 +73,7 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
     } catch (e) {
       console.error('Failed to handle rankings:', e);
     }
-  }, [playerStats]);
+  }, [playerStats, finalScore, isSurvived]);
 
   const handleClearRankings = () => {
     try {
@@ -91,28 +93,37 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
   let feedbackText = '防災対策の見直しが必要です。避難行動を繰り返し疑似体験して、正しい行動パターンを身につけましょう。';
 
   if (isSurvived) {
-    if (playerStats.score >= 500 && playerStats.health >= 80) {
+    if (finalScore >= 500 && playerStats.health >= 80) {
       grade = 'S';
       gradeColor = 'text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300';
       feedbackText = '完璧です！すべての難関をクリアし、正しい知識を持って命を守り抜きました。本物の防災マスターです！';
-    } else if (playerStats.score >= 350) {
+    } else if (finalScore >= 350) {
       grade = 'A';
       gradeColor = 'text-emerald-400';
       feedbackText = '素晴らしい判断力です。概ね適切な判断ができていますが、小さな怪我や装備の見落としがありました。次は完全無傷避難を目指しましょう。';
-    } else {
+    } else if (finalScore >= 200) {
       grade = 'B';
       gradeColor = 'text-blue-400';
-      feedbackText = '無さに避難できましたが、危険な判断や装備の不足がありました。実際の災害では、この差が命取りになることもあります。解説をよく読んで学びましょう。';
-    }
-  } else {
-    if (playerStats.survivalResult === 'FAILED_EARTHQUAKE') {
+      feedbackText = '無事に避難できましたが、危険な判断や装備の不足がありました。実際の災害では、この差が命取りになることもあります。解説をよく読んで学びましょう。';
+    } else {
       grade = 'C';
       gradeColor = 'text-orange-400';
-      feedbackText = '地震発生直後の揺れの中、落下物への対策が不十分でした。まずは「姿勢を低くし、頭部を守る（シェイクアウト）」を意識してください。';
+      feedbackText = '生存には成功しましたが、行動や備えに多くの課題がありました。実際の災害に備え、より安全な行動パターンを身につけましょう。';
+    }
+  } else {
+    // 死亡しているが、スコアに応じた評価判定を行う
+    if (finalScore >= 350) {
+      grade = 'B';
+      gradeColor = 'text-blue-400';
+      feedbackText = '非常に優れた防災知識と避難行動でしたが、紙一重のところで生存に至りませんでした（スコア30%減算のペナルティが適用されています）。装備や移動ルートをさらに最適化すれば、確実に生存できるはずです！';
+    } else if (finalScore >= 200) {
+      grade = 'C';
+      gradeColor = 'text-orange-400';
+      feedbackText = '適切な判断やアイテムの準備はできていましたが、惜しくも避難完了には届きませんでした（スコア30%減算のペナルティが適用されています）。あと一歩です、改善点を見直して再挑戦しましょう。';
     } else {
-      grade = 'C-';
-      gradeColor = 'text-red-400';
-      feedbackText = '大津波の到達スピードを見誤る、または避難ルートや手段の選択で危険な行動を取り、逃げ遅れてしまいました。津波からの避難は1分1秒を争う行動が求められます。';
+      grade = 'D';
+      gradeColor = 'text-red-500';
+      feedbackText = '避難行動や装備、初期判断に多くの課題が残り、生存に至りませんでした（スコア30%減算のペナルティが適用されています）。解説をよく読み、繰り返し挑戦して身を守る行動を覚えましょう。';
     }
   }
 
@@ -161,7 +172,12 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
           </div>
           <div className="flex flex-col items-center justify-center border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-slate-800/60" id="score-col">
             <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">獲得総合スコア</span>
-            <span className="text-3xl font-mono font-black text-white" id="score-value">{playerStats.score} <span className="text-xs text-slate-400">Pts</span></span>
+            <span className="text-3xl font-mono font-black text-white" id="score-value">{finalScore} <span className="text-xs text-slate-400">Pts</span></span>
+            {deathPenaltyApplied && (
+              <span className="text-[10px] text-red-400 font-semibold mt-1">
+                ※死亡ペナルティ(30%減算)<br />元のスコア: {playerStats.score} Pts
+              </span>
+            )}
             {isNewHighScore && (
               <span className="text-[10px] bg-amber-500/10 text-amber-400 font-extrabold px-2 py-0.5 rounded border border-amber-500/30 animate-pulse mt-1.5 flex items-center gap-1">
                 🏆 自己ベスト更新!

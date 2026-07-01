@@ -68,13 +68,14 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
     if (escapeCountdownRef.current) clearInterval(escapeCountdownRef.current);
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
 
-    setPlayerStats((prev) => ({
-      ...prev,
-      health: 0,
-      survivalResult: 'FAILED_EARTHQUAKE',
-    }));
-    
-    onNextPhase('RESULT');
+    setTimeout(() => {
+      setPlayerStats((prev) => ({
+        ...prev,
+        health: 0,
+        survivalResult: 'FAILED_EARTHQUAKE',
+      }));
+      onNextPhase('RESULT');
+    }, 0);
   };
 
   // Keep player position ref up to date
@@ -374,10 +375,12 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
       }
 
       // 回避自体に対する基礎スコア
-      setPlayerStats((prev) => ({
-        ...prev,
-        score: prev.score + 10 + (nextCombo * 2), // コンボが繋がるほどスコア増加
-      }));
+      setTimeout(() => {
+        setPlayerStats((prev) => ({
+          ...prev,
+          score: prev.score + 10 + (nextCombo * 2), // コンボが繋がるほどスコア増加
+        }));
+      }, 0);
 
       if (nextCombo % 3 === 0) {
         addEffect(item.id, `${nextCombo} COMBO!`, 'text-cyan-400 font-extrabold text-xs', item.x, 90);
@@ -392,11 +395,13 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
     setCombo(nextCombo);
     setMaxCombo((mc) => Math.max(mc, nextCombo));
 
-    setPlayerStats((prev) => ({
-      ...prev,
-      score: prev.score + 40,
-      health: Math.min(prev.maxHealth, prev.health + 2), // 実力回避でHPが2回復！
-    }));
+    setTimeout(() => {
+      setPlayerStats((prev) => ({
+        ...prev,
+        score: prev.score + 40,
+        health: Math.min(prev.maxHealth, prev.health + 2), // 実力回避でHPが2回復！
+      }));
+    }, 0);
     
     addEffect(item.id, '⚡ JUST DODGE! +40', 'text-amber-300 font-black tracking-wider text-[9px] animate-pulse', item.x, 75);
   };
@@ -515,13 +520,15 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
       const damageMultiplier = diff === 'EASY' ? 0.65 : diff === 'HARD' ? 1.45 : 1.0;
       const finalDamage = Math.round(baseFinalDamage * damageMultiplier);
 
-      setPlayerStats((prev) => {
-        const newHealth = Math.max(0, prev.health - finalDamage);
-        return {
-          ...prev,
-          health: newHealth,
-        };
-      });
+      setTimeout(() => {
+        setPlayerStats((prev) => {
+          const newHealth = Math.max(0, prev.health - finalDamage);
+          return {
+            ...prev,
+            health: newHealth,
+          };
+        });
+      }, 0);
 
       // Visual floating effect text
       addEffect(item.id, `💥痛っ! -${finalDamage} HP (コンボ終了)`, 'text-red-500 font-extrabold text-[10px]', item.x, 82);
@@ -543,11 +550,13 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
         scoreBonus = 200;
       }
 
-      setPlayerStats((prev) => ({
-        ...prev,
-        [itemKey]: true,
-        score: prev.score + scoreBonus,
-      }));
+      setTimeout(() => {
+        setPlayerStats((prev) => ({
+          ...prev,
+          [itemKey]: true,
+          score: prev.score + scoreBonus,
+        }));
+      }, 0);
 
       addEffect(item.id, `GET! ${item.label}`, 'text-emerald-400 font-bold', item.x, 90);
     }
@@ -568,10 +577,12 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
     
     // Check if player died during earthquake
     if (playerStats.health <= 0) {
-      setPlayerStats((prev) => ({
-        ...prev,
-        survivalResult: 'FAILED_EARTHQUAKE',
-      }));
+      setTimeout(() => {
+        setPlayerStats((prev) => ({
+          ...prev,
+          survivalResult: 'FAILED_EARTHQUAKE',
+        }));
+      }, 0);
       setPhase('OUTRO');
     } else {
       setPhase('OUTRO');
