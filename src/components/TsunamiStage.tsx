@@ -402,8 +402,6 @@ interface TsunamiStageProps {
 
 export default function TsunamiStage({ playerStats, setPlayerStats, onNextPhase }: TsunamiStageProps) {
   const [phase, setPhase] = useState<'INTRO' | 'PLAYING' | 'DECISION' | 'OUTRO'>('INTRO');
-  const [escapeTimeLeft, setEscapeTimeLeft] = useState<number>(45); // 避難残り時間
-  const escapeCountdownRef = useRef<any>(null);
   
   // Game parameters
   const [playerDistance, setPlayerDistance] = useState<number>(0); // Progress from 0 to 1000 meters
@@ -429,55 +427,9 @@ export default function TsunamiStage({ playerStats, setPlayerStats, onNextPhase 
   // Create a ref for playerStats to avoid closure issues with outdated states
   const playerStatsRef = useRef<PlayerStats>(playerStats);
 
-  // Force Tsunami Time Over Result Screen
-  const handleTimeOver = () => {
-    if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
-    if (escapeCountdownRef.current) clearInterval(escapeCountdownRef.current);
-    
-    setPlayerStats((prev) => ({
-      ...prev,
-      health: 0,
-      survivalResult: 'FAILED_TSUNAMI',
-    }));
-    
-    onNextPhase('RESULT');
-  };
-
   useEffect(() => {
     playerStatsRef.current = playerStats;
   }, [playerStats]);
-
-  // Global Realtime countdown timer for Tsunami
-  useEffect(() => {
-    if (phase !== 'PLAYING' && phase !== 'DECISION') {
-      if (escapeCountdownRef.current) {
-        clearInterval(escapeCountdownRef.current);
-        escapeCountdownRef.current = null;
-      }
-      return;
-    }
-
-    if (!escapeCountdownRef.current) {
-      escapeCountdownRef.current = setInterval(() => {
-        setEscapeTimeLeft((prev) => {
-          if (prev <= 0.1) {
-            clearInterval(escapeCountdownRef.current);
-            escapeCountdownRef.current = null;
-            handleTimeOver();
-            return 0;
-          }
-          return Number((prev - 0.1).toFixed(1));
-        });
-      }, 100);
-    }
-
-    return () => {
-      if (escapeCountdownRef.current) {
-        clearInterval(escapeCountdownRef.current);
-        escapeCountdownRef.current = null;
-      }
-    };
-  }, [phase]);
 
   useEffect(() => {
     // クイズプールから各タイプ1つずつランダムに選択し、選択肢をシャッフルする
@@ -524,9 +476,6 @@ export default function TsunamiStage({ playerStats, setPlayerStats, onNextPhase 
     const startTsuDist = diff === 'EASY' ? -350 : diff === 'HARD' ? -180 : -250;
     setTsunamiDistance(startTsuDist);
     setStamina(100);
-
-    const initialEscapeTime = diff === 'EASY' ? 55.0 : diff === 'HARD' ? 32.0 : 42.0;
-    setEscapeTimeLeft(initialEscapeTime);
 
     // Speed multiplier based on shoes from Phase 1
     const speedPenalty = playerStatsRef.current.hasShoes ? 1.0 : 0.65; // No shoes = much slower!
@@ -861,16 +810,7 @@ export default function TsunamiStage({ playerStats, setPlayerStats, onNextPhase 
             className="flex flex-col gap-2 w-full max-w-xl mx-auto"
             id="ts-gameplay-container"
           >
-            {/* Realtime Escape Timer */}
-            <div className="w-full py-1.5 px-3 bg-red-950/40 border border-red-500/30 rounded-xl text-center flex items-center justify-between gap-3 animate-pulse" id="ts-realtime-escape-timer">
-              <span className="flex items-center gap-1.5 text-[10px] md:text-xs font-black text-red-400">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                🚨 避難制限（津波到達リミット）
-              </span>
-              <span className={`font-mono text-lg md:text-xl font-black ${escapeTimeLeft <= 8 ? 'text-red-500 scale-110 animate-bounce' : 'text-orange-400'}`}>
-                {escapeTimeLeft.toFixed(1)} 秒
-              </span>
-            </div>
+            {/* Realtime Escape Timer is removed to make survival purely physical distance based */}
 
             {/* Status Header - Slimmed */}
             <div className="grid grid-cols-3 gap-2 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 text-center" id="ts-status-grid">

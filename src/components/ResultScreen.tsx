@@ -406,222 +406,232 @@ export default function ResultScreen({ playerStats, onRetry }: ResultScreenProps
             </div>
 
             {/* DECISION 1: Earthquake Quiz */}
-            <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-eq-quiz">
-              <div className="mt-0.5">
-                {playerStats.earthquakeQuizCorrect === true ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                ) : (
-                  <XCircle className="w-5 h-5 text-red-400" />
-                )}
+            {playerStats.earthquakeQuizCorrect !== null && (
+              <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-eq-quiz">
+                <div className="mt-0.5">
+                  {playerStats.earthquakeQuizCorrect === true ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-white text-sm flex justify-between">
+                    <span>🚪 地震直後の状況判断</span>
+                    <span className={playerStats.earthquakeQuizCorrect === true ? 'text-emerald-400' : 'text-red-400'}>
+                      {playerStats.earthquakeQuizCorrect === true ? '正解 (+150)' : '不正解'}
+                    </span>
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    地震発生直後の小康状態（一時的に揺れが収まった時）には、まず足を保護して避難用の扉を開けることが鉄則です。エレベーターの使用は閉じ込めのリスクがあるため厳禁です。
+                  </p>
+                </div>
               </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-white text-sm flex justify-between">
-                  <span>🚪 地震直後の状況判断</span>
-                  <span className={playerStats.earthquakeQuizCorrect === true ? 'text-emerald-400' : 'text-red-400'}>
-                    {playerStats.earthquakeQuizCorrect === true ? '正解 (+150)' : '不正解'}
-                  </span>
-                </h4>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  地震発生直後の小康状態（一時的に揺れが収まった時）には、まず足を保護して避難用の扉を開けることが鉄則です。エレベーターの使用は閉じ込めのリスクがあるため厳禁です。
-                </p>
-              </div>
-            </div>
+            )}
 
             {/* DECISION 2: Tsunami Car */}
-            <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-car">
-              <div className="mt-0.5">
-                {playerStats.tsunamiDecisions.carResult ? (
-                  playerStats.tsunamiDecisions.carResult.resultType === 'correct' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : playerStats.tsunamiDecisions.carResult.resultType === 'semi' ? (
-                    <CheckCircle2 className="w-5 h-5 text-amber-400" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  )
-                ) : (
-                  playerStats.tsunamiDecisions.carVsFoot === 'foot' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  )
-                )}
-              </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
-                  <span>🚶 {playerStats.tsunamiDecisions.carResult?.title || '避難手段の選択'}</span>
-                  <span className={
-                    playerStats.tsunamiDecisions.carResult 
-                      ? playerStats.tsunamiDecisions.carResult.resultType === 'correct'
-                        ? 'text-emerald-400'
-                        : playerStats.tsunamiDecisions.carResult.resultType === 'semi'
-                        ? 'text-amber-400'
-                        : 'text-red-400'
-                      : playerStats.tsunamiDecisions.carVsFoot === 'foot' ? 'text-emerald-400' : 'text-red-400'
-                  }>
-                    {playerStats.tsunamiDecisions.carResult 
-                      ? `${playerStats.tsunamiDecisions.carResult.badge}：${playerStats.tsunamiDecisions.carResult.desc}`
-                      : playerStats.tsunamiDecisions.carVsFoot === 'foot' ? '適切：徒歩を選択' : '不適切：車を選択 (渋滞に捕まりました)'}
-                  </span>
-                </h4>
-                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+            {playerStats.tsunamiDecisions.carVsFoot !== null && (
+              <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-car">
+                <div className="mt-0.5">
                   {playerStats.tsunamiDecisions.carResult ? (
-                    <>
-                      <span className="text-slate-300 block mb-1"><strong>選択した避難手段:</strong> {playerStats.tsunamiDecisions.carResult.selectedText}</span>
-                      <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.carResult.explanation}</strong>
-                    </>
+                    playerStats.tsunamiDecisions.carResult.resultType === 'correct' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    ) : playerStats.tsunamiDecisions.carResult.resultType === 'semi' ? (
+                      <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    )
                   ) : (
-                    '東日本大震災でも車が道路渋滞を引き起こし、そのまま波にのまれる大惨事が起きています。特別な支援を必要とする方を除き、津波避難は「徒歩」が基本です。'
+                    playerStats.tsunamiDecisions.carVsFoot === 'foot' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    )
                   )}
-                </p>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
+                    <span>🚶 {playerStats.tsunamiDecisions.carResult?.title || '避難手段の選択'}</span>
+                    <span className={
+                      playerStats.tsunamiDecisions.carResult 
+                        ? playerStats.tsunamiDecisions.carResult.resultType === 'correct'
+                          ? 'text-emerald-400'
+                          : playerStats.tsunamiDecisions.carResult.resultType === 'semi'
+                          ? 'text-amber-400'
+                          : 'text-red-400'
+                        : playerStats.tsunamiDecisions.carVsFoot === 'foot' ? 'text-emerald-400' : 'text-red-400'
+                    }>
+                      {playerStats.tsunamiDecisions.carResult 
+                        ? `${playerStats.tsunamiDecisions.carResult.badge}：${playerStats.tsunamiDecisions.carResult.desc}`
+                        : playerStats.tsunamiDecisions.carVsFoot === 'foot' ? '適切：徒歩を選択' : '不適切：車を選択 (渋滞に捕まりました)'}
+                    </span>
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                    {playerStats.tsunamiDecisions.carResult ? (
+                      <>
+                        <span className="text-slate-300 block mb-1"><strong>選択した避難手段:</strong> {playerStats.tsunamiDecisions.carResult.selectedText}</span>
+                        <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.carResult.explanation}</strong>
+                      </>
+                    ) : (
+                      '東日本大震災でも車が道路渋滞を引き起こし、そのまま波にのまれる大惨事が起きています。特別な支援を必要とする方を除き、津波避難は「徒歩」が基本です。'
+                    )}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* DECISION 2.5: Tsunami Block Wall */}
-            <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-blockwall">
-              <div className="mt-0.5">
-                {playerStats.tsunamiDecisions.blockWallResult ? (
-                  playerStats.tsunamiDecisions.blockWallResult.resultType === 'correct' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : playerStats.tsunamiDecisions.blockWallResult.resultType === 'semi' ? (
-                    <CheckCircle2 className="w-5 h-5 text-amber-400" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  )
-                ) : (
-                  playerStats.tsunamiDecisions.blockWall === 'wide' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  )
-                )}
-              </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
-                  <span>🏘️ {playerStats.tsunamiDecisions.blockWallResult?.title || '避難時の危険回避'}</span>
-                  <span className={
-                    playerStats.tsunamiDecisions.blockWallResult 
-                      ? playerStats.tsunamiDecisions.blockWallResult.resultType === 'correct'
-                        ? 'text-emerald-400'
-                        : playerStats.tsunamiDecisions.blockWallResult.resultType === 'semi'
-                        ? 'text-amber-400'
-                        : 'text-red-400'
-                      : playerStats.tsunamiDecisions.blockWall === 'wide' ? 'text-emerald-400' : 'text-red-400'
-                  }>
-                    {playerStats.tsunamiDecisions.blockWallResult 
-                      ? `${playerStats.tsunamiDecisions.blockWallResult.badge}：${playerStats.tsunamiDecisions.blockWallResult.desc}`
-                      : playerStats.tsunamiDecisions.blockWall === 'wide' ? '適切：広い大通りを選択' : '不適切：ブロック塀のそばを選択 (倒壊下敷きリスク)'}
-                  </span>
-                </h4>
-                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+            {playerStats.tsunamiDecisions.blockWall !== null && (
+              <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-blockwall">
+                <div className="mt-0.5">
                   {playerStats.tsunamiDecisions.blockWallResult ? (
-                    <>
-                      <span className="text-slate-300 block mb-1"><strong>選択した行動:</strong> {playerStats.tsunamiDecisions.blockWallResult.selectedText}</span>
-                      <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.blockWallResult.explanation}</strong>
-                    </>
+                    playerStats.tsunamiDecisions.blockWallResult.resultType === 'correct' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    ) : playerStats.tsunamiDecisions.blockWallResult.resultType === 'semi' ? (
+                      <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    )
                   ) : (
-                    '大地震直後の密集市街地や住宅街には、古いブロック塀や自動販売機の倒壊リスクが潜んでいます。古い塀の近くは余震で倒れて下敷きになる危険性が非常に高いため、決して近寄らず、道幅の広い開けた大通りを避難ルートに選ぶのが鉄則です。'
+                    playerStats.tsunamiDecisions.blockWall === 'wide' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    )
                   )}
-                </p>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
+                    <span>🏘️ {playerStats.tsunamiDecisions.blockWallResult?.title || '避難時の危険回避'}</span>
+                    <span className={
+                      playerStats.tsunamiDecisions.blockWallResult 
+                        ? playerStats.tsunamiDecisions.blockWallResult.resultType === 'correct'
+                          ? 'text-emerald-400'
+                          : playerStats.tsunamiDecisions.blockWallResult.resultType === 'semi'
+                          ? 'text-amber-400'
+                          : 'text-red-400'
+                        : playerStats.tsunamiDecisions.blockWall === 'wide' ? 'text-emerald-400' : 'text-red-400'
+                    }>
+                      {playerStats.tsunamiDecisions.blockWallResult 
+                        ? `${playerStats.tsunamiDecisions.blockWallResult.badge}：${playerStats.tsunamiDecisions.blockWallResult.desc}`
+                        : playerStats.tsunamiDecisions.blockWall === 'wide' ? '適切：広い大通りを選択' : '不適切：ブロック塀のそばを選択 (倒壊下敷きリスク)'}
+                    </span>
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                    {playerStats.tsunamiDecisions.blockWallResult ? (
+                      <>
+                        <span className="text-slate-300 block mb-1"><strong>選択した行動:</strong> {playerStats.tsunamiDecisions.blockWallResult.selectedText}</span>
+                        <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.blockWallResult.explanation}</strong>
+                      </>
+                    ) : (
+                      '大地震直後の密集市街地や住宅街には、古いブロック塀や自動販売機の倒壊リスクが潜んでいます。古い塀の近くは余震で倒れて下敷きになる危険性が非常に高いため、決して近寄らず、道幅の広い開けた大通りを避難ルートに選ぶのが鉄則です。'
+                    )}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* DECISION 3: Tsunami Route */}
-            <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-route">
-              <div className="mt-0.5">
-                {playerStats.tsunamiDecisions.routeResult ? (
-                  playerStats.tsunamiDecisions.routeResult.resultType === 'correct' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : playerStats.tsunamiDecisions.routeResult.resultType === 'semi' ? (
-                    <CheckCircle2 className="w-5 h-5 text-amber-400" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  )
-                ) : (
-                  playerStats.tsunamiDecisions.routeSelection === 'safe' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  )
-                )}
-              </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
-                  <span>🗺️ {playerStats.tsunamiDecisions.routeResult?.title || '避難ルートの選択'}</span>
-                  <span className={
-                    playerStats.tsunamiDecisions.routeResult 
-                      ? playerStats.tsunamiDecisions.routeResult.resultType === 'correct'
-                        ? 'text-emerald-400'
-                        : playerStats.tsunamiDecisions.routeResult.resultType === 'semi'
-                        ? 'text-amber-400'
-                        : 'text-red-400'
-                      : playerStats.tsunamiDecisions.routeSelection === 'safe' ? 'text-emerald-400' : 'text-red-400'
-                  }>
-                    {playerStats.tsunamiDecisions.routeResult 
-                      ? `${playerStats.tsunamiDecisions.routeResult.badge}：${playerStats.tsunamiDecisions.routeResult.desc}`
-                      : playerStats.tsunamiDecisions.routeSelection === 'safe' ? '適切：安全な平坦道路' : '不適切：危険崖沿い道路 (土砂崩れの直撃)'}
-                  </span>
-                </h4>
-                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+            {playerStats.tsunamiDecisions.routeSelection !== null && (
+              <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-route">
+                <div className="mt-0.5">
                   {playerStats.tsunamiDecisions.routeResult ? (
-                    <>
-                      <span className="text-slate-300 block mb-1"><strong>選択した避難ルート:</strong> {playerStats.tsunamiDecisions.routeResult.selectedText}</span>
-                      <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.routeResult.explanation}</strong>
-                    </>
+                    playerStats.tsunamiDecisions.routeResult.resultType === 'correct' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    ) : playerStats.tsunamiDecisions.routeResult.resultType === 'semi' ? (
+                      <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    )
                   ) : (
-                    '大きな本震の直後は、斜面や地盤がとても不安定になっています。近道だからといって崖沿いを進むと、落石や土砂崩れに巻き込まれるため、遠回りでも安全な開けた道を選んで避難します。'
+                    playerStats.tsunamiDecisions.routeSelection === 'safe' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    )
                   )}
-                </p>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
+                    <span>🗺️ {playerStats.tsunamiDecisions.routeResult?.title || '避難ルートの選択'}</span>
+                    <span className={
+                      playerStats.tsunamiDecisions.routeResult 
+                        ? playerStats.tsunamiDecisions.routeResult.resultType === 'correct'
+                          ? 'text-emerald-400'
+                          : playerStats.tsunamiDecisions.routeResult.resultType === 'semi'
+                          ? 'text-amber-400'
+                          : 'text-red-400'
+                        : playerStats.tsunamiDecisions.routeSelection === 'safe' ? 'text-emerald-400' : 'text-red-400'
+                    }>
+                      {playerStats.tsunamiDecisions.routeResult 
+                        ? `${playerStats.tsunamiDecisions.routeResult.badge}：${playerStats.tsunamiDecisions.routeResult.desc}`
+                        : playerStats.tsunamiDecisions.routeSelection === 'safe' ? '適切：安全な平坦道路' : '不適切：危険崖沿い道路 (土砂崩れの直撃)'}
+                    </span>
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                    {playerStats.tsunamiDecisions.routeResult ? (
+                      <>
+                        <span className="text-slate-300 block mb-1"><strong>選択した避難ルート:</strong> {playerStats.tsunamiDecisions.routeResult.selectedText}</span>
+                        <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.routeResult.explanation}</strong>
+                      </>
+                    ) : (
+                      '大きな本震の直後は、斜面や地盤がとても不安定になっています。近道だからといって崖沿いを進むと、落石や土砂崩れに巻き込まれるため、遠回りでも安全な開けた道を選んで避難します。'
+                    )}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* DECISION 4: Tsunami building */}
-            <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-stair">
-              <div className="mt-0.5">
-                {playerStats.tsunamiDecisions.stairsResult ? (
-                  playerStats.tsunamiDecisions.stairsResult.resultType === 'correct' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : playerStats.tsunamiDecisions.stairsResult.resultType === 'semi' ? (
-                    <CheckCircle2 className="w-5 h-5 text-amber-400" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  )
-                ) : (
-                  playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  )
-                )}
-              </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
-                  <span>🏢 {playerStats.tsunamiDecisions.stairsResult?.title || '垂直避難手段：非常階段 vs エレベーター'}</span>
-                  <span className={
-                    playerStats.tsunamiDecisions.stairsResult 
-                      ? playerStats.tsunamiDecisions.stairsResult.resultType === 'correct'
-                        ? 'text-emerald-400'
-                        : playerStats.tsunamiDecisions.stairsResult.resultType === 'semi'
-                        ? 'text-amber-400'
-                        : 'text-red-400'
-                      : playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? 'text-emerald-400' : 'text-red-400'
-                  }>
-                    {playerStats.tsunamiDecisions.stairsResult 
-                      ? `${playerStats.tsunamiDecisions.stairsResult.badge}：${playerStats.tsunamiDecisions.stairsResult.desc}`
-                      : playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? '適切：非常階段で這い上がる' : '不適切：エレベーターを使用'}
-                  </span>
-                </h4>
-                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+            {playerStats.tsunamiDecisions.stairsVsElevator !== null && (
+              <div className="flex gap-4 p-4 rounded-xl bg-slate-950 border border-slate-900" id="log-ts-stair">
+                <div className="mt-0.5">
                   {playerStats.tsunamiDecisions.stairsResult ? (
-                    <>
-                      <span className="text-slate-300 block mb-1"><strong>選択した避難行動:</strong> {playerStats.tsunamiDecisions.stairsResult.selectedText}</span>
-                      <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.stairsResult.explanation}</strong>
-                    </>
+                    playerStats.tsunamiDecisions.stairsResult.resultType === 'correct' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    ) : playerStats.tsunamiDecisions.stairsResult.resultType === 'semi' ? (
+                      <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    )
                   ) : (
-                    '高台に逃げる時間がない場合は、近くの「津波避難ビル」などの丈夫な建物に垂直避難します。しかし、エレベーターは停電等による閉じ込めの致命的な罠となるため、絶対に階段を使用してください。'
+                    playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    )
                   )}
-                </p>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-white text-sm flex flex-col md:flex-row justify-between gap-1">
+                    <span>🏢 {playerStats.tsunamiDecisions.stairsResult?.title || '垂直避難手段：非常階段 vs エレベーター'}</span>
+                    <span className={
+                      playerStats.tsunamiDecisions.stairsResult 
+                        ? playerStats.tsunamiDecisions.stairsResult.resultType === 'correct'
+                          ? 'text-emerald-400'
+                          : playerStats.tsunamiDecisions.stairsResult.resultType === 'semi'
+                          ? 'text-amber-400'
+                          : 'text-red-400'
+                        : playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? 'text-emerald-400' : 'text-red-400'
+                    }>
+                      {playerStats.tsunamiDecisions.stairsResult 
+                        ? `${playerStats.tsunamiDecisions.stairsResult.badge}：${playerStats.tsunamiDecisions.stairsResult.desc}`
+                        : playerStats.tsunamiDecisions.stairsVsElevator === 'stairs' ? '適切：非常階段で走る' : '不適切：エレベーターを使用'}
+                    </span>
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                    {playerStats.tsunamiDecisions.stairsResult ? (
+                      <>
+                        <span className="text-slate-300 block mb-1"><strong>選択した避難行動:</strong> {playerStats.tsunamiDecisions.stairsResult.selectedText}</span>
+                        <strong className="text-slate-200 block mt-1 bg-slate-900 p-2.5 rounded border border-slate-800">💡 防災解説: {playerStats.tsunamiDecisions.stairsResult.explanation}</strong>
+                      </>
+                    ) : (
+                      '高台に逃げる時間がない場合は、近くの「津波避難ビル」などの丈夫な建物に垂直避難します。しかし、エレベーターは停電等による閉じ込めの致命的な罠となるため、絶対に階段を使用してください。'
+                    )}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 

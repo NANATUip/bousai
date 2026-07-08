@@ -41,7 +41,6 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
   const [playerPosition, setPlayerPosition] = useState<number>(50); // percentage (0 to 100)
   const [items, setItems] = useState<FallingItem[]>([]);
   const [timeLeft, setTimeLeft] = useState<number>(20); // 20 seconds gameplay
-  const [escapeTimeLeft, setEscapeTimeLeft] = useState<number>(28); // 避難残り時間
   const [activeEffects, setActiveEffects] = useState<{ id: string; text: string; color: string; x: number; y: number }[]>([]);
   const [quizAnswered, setQuizAnswered] = useState<boolean>(false);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -52,7 +51,6 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
   const gameLoopRef = useRef<number | null>(null);
   const spawnTimerRef = useRef<any>(null);
   const countdownRef = useRef<any>(null);
-  const escapeCountdownRef = useRef<any>(null);
   const playerPositionRef = useRef<number>(50);
   const collidedItemsRef = useRef<FallingItem[]>([]);
   const escapedItemsRef = useRef<FallingItem[]>([]);
@@ -61,59 +59,10 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
   const justDodgeProcessedRef = useRef<Set<string>>(new Set());
   const comboRef = useRef<number>(0);
 
-  // Time Over Handler (Force result screen)
-  const handleTimeOver = () => {
-    if (spawnTimerRef.current) clearInterval(spawnTimerRef.current);
-    if (countdownRef.current) clearInterval(countdownRef.current);
-    if (escapeCountdownRef.current) clearInterval(escapeCountdownRef.current);
-    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-
-    setTimeout(() => {
-      setPlayerStats((prev) => ({
-        ...prev,
-        health: 0,
-        survivalResult: 'FAILED_EARTHQUAKE',
-      }));
-      onNextPhase('RESULT');
-    }, 0);
-  };
-
   // Keep player position ref up to date
   useEffect(() => {
     playerPositionRef.current = playerPosition;
   }, [playerPosition]);
-
-  // Global Countdown Timer for Earthquake
-  useEffect(() => {
-    if (phase !== 'PLAYING' && phase !== 'QUIZ') {
-      if (escapeCountdownRef.current) {
-        clearInterval(escapeCountdownRef.current);
-        escapeCountdownRef.current = null;
-      }
-      return;
-    }
-
-    if (!escapeCountdownRef.current) {
-      escapeCountdownRef.current = setInterval(() => {
-        setEscapeTimeLeft((prev) => {
-          if (prev <= 0.1) {
-            clearInterval(escapeCountdownRef.current);
-            escapeCountdownRef.current = null;
-            handleTimeOver();
-            return 0;
-          }
-          return Number((prev - 0.1).toFixed(1));
-        });
-      }, 100);
-    }
-
-    return () => {
-      if (escapeCountdownRef.current) {
-        clearInterval(escapeCountdownRef.current);
-        escapeCountdownRef.current = null;
-      }
-    };
-  }, [phase]);
 
   const spawnSpecificItem = (type: FallingItem['type'], label: string) => {
     const playerX = playerPositionRef.current;
@@ -779,17 +728,6 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
             className="flex flex-col gap-2 w-full max-w-xl mx-auto"
             id="eq-gameplay-container"
           >
-            {/* Realtime Escape Timer */}
-            <div className="w-full py-1.5 px-3 bg-red-950/40 border border-red-500/30 rounded-xl text-center flex items-center justify-between gap-3 animate-pulse" id="eq-realtime-escape-timer">
-              <span className="flex items-center gap-1.5 text-[10px] md:text-xs font-black text-red-400">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                🚨 避難制限（倒壊リミット）
-              </span>
-              <span className={`font-mono text-lg md:text-xl font-black ${escapeTimeLeft <= 5 ? 'text-red-500 scale-110' : 'text-orange-400'}`}>
-                {escapeTimeLeft.toFixed(1)} 秒
-              </span>
-            </div>
-
             {/* Status Header - More compact */}
             <div className="flex justify-between items-center bg-slate-900/60 p-2 rounded-xl border border-slate-800" id="eq-status-bar">
               <div className="flex items-center gap-2" id="health-container">
@@ -980,17 +918,6 @@ export default function EarthquakeStage({ playerStats, setPlayerStats, onNextPha
             className="bg-slate-900 border-2 border-orange-500/70 rounded-2xl p-4 md:p-5 shadow-2xl shadow-orange-500/10 w-full max-w-xl mx-auto"
             id="eq-quiz-card"
           >
-            {/* Realtime Escape Timer */}
-            <div className="w-full py-1.5 px-3 bg-red-950/40 border border-red-500/30 rounded-xl text-center flex items-center justify-between gap-3 mb-3 animate-pulse" id="eq-quiz-escape-timer">
-              <span className="flex items-center gap-1.5 text-[10px] md:text-xs font-black text-red-400">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                🚨 避難制限（回答中もタイマーは減少します）
-              </span>
-              <span className={`font-mono text-lg md:text-xl font-black ${escapeTimeLeft <= 5 ? 'text-red-500 scale-110' : 'text-orange-400'}`}>
-                {escapeTimeLeft.toFixed(1)} 秒
-              </span>
-            </div>
-
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-bold mb-2.5" id="quiz-badge">
               <Flame className="w-3 h-3" />
               急を要する状況判断！
